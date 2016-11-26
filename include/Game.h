@@ -45,6 +45,8 @@ class Game {
         sf::Vector2f groundDim;
 
         sf::Vector2f viewDimensions;
+
+        float best_x = 0.0f;
 };
 
 #endif // GAME_H

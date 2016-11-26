@@ -24,7 +24,7 @@ void Creature::addRandomNode() {
     nodes.emplace_back();
     Node& new_node = nodes.back();
 
-    float dist = 6;
+    float dist = 1.5;
     sf::Vector2f offset(random_float(-dist, dist), random_float(-dist, dist));
     new_node.init(world, nodes[parent].getPosition() + offset,
                   random_float(0, 1)); // Friction
@@ -75,6 +75,13 @@ void Creature::update(float dt) {
     for(unsigned i = 0; i < muscles.size(); ++i) {
         muscles[i].update(timer/heart_beat, dt);
     }
+
+    // Set position to center of nodes
+    sf::Vector2f sum(0, 0);
+    for(unsigned i = 0; i < nodes.size(); ++i) {
+        sum += nodes[i].getPosition();
+    }
+    pos = sum / (float) nodes.size();
 }
 
 void Creature::render(sf::RenderTarget& rt) {
@@ -88,6 +95,7 @@ void Creature::render(sf::RenderTarget& rt) {
 
 const float MIN_STRENGTH = 3.0f;
 const float MAX_STRENGTH = 12.0f;
+const float MUSCLE_THICKNESS = 0.2f;
 
 Muscle::Muscle(b2World* world, b2DistanceJointDef& def,
                float short_len_, float long_len_,
@@ -117,7 +125,7 @@ void Muscle::render(sf::RenderTarget& rt) {
 
     sf::Vector2f a(joint->GetBodyA()->GetPosition().x, joint->GetBodyA()->GetPosition().y);
     sf::Vector2f b(joint->GetBodyB()->GetPosition().x, joint->GetBodyB()->GetPosition().y);
-    rect.setSize(sf::Vector2f(0.5f - 0.2f*(joint->GetLength()-short_len)/(long_len-short_len), magnitude(a-b)));
+    rect.setSize(sf::Vector2f(MUSCLE_THICKNESS * (1.0 - 0.5*(joint->GetLength()-short_len)/(long_len-short_len)), magnitude(a-b)));
     rect.setOrigin(rect.getSize().x*0.5f, rect.getSize().y);
     rect.setPosition(a);
     rect.rotate(vecToAngle(b-a));
@@ -146,7 +154,7 @@ void Node::init(b2World* world, const sf::Vector2f& pos, float friction) {
     body = world->CreateBody(&body_def);
 
     shape.m_p.Set(0, 0); //position, relative to body position
-    shape.m_radius = 0.5; //radius
+    shape.m_radius = MUSCLE_THICKNESS*0.8; //radius
 
     fixture_def.shape = &shape; //this is a pointer to the shape above
     fixture_def.friction = friction;

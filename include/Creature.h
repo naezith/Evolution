@@ -14,14 +14,14 @@ class Muscle {
 
         b2DistanceJoint* joint = nullptr;
 
-        float short_len = 1.5f;
-        float long_len = 3.0f;
+        float short_len;
+        float long_len;
         float* target_len = nullptr;
 
-        float extend_time = 0.75f;
-        float contract_time = 0.25f;
+        float extend_time;
+        float contract_time;
 
-        float strength = 1.0f;
+        float strength;
         sf::Color c;
 };
 
@@ -48,7 +48,7 @@ class Creature {
         void init(b2World* world, const sf::Vector2f& pos);
         void update(float dt);
         void render(sf::RenderTarget& rt);
-
+        const sf::Vector2f& getPosition() const { return pos; };
 
         void addRandomNode();
         void addMuscle(Node* a, Node* b);
@@ -60,6 +60,8 @@ class Creature {
         float heart_beat = 0.5f;
 
         b2World* world;
+    private:
+        sf::Vector2f pos;
 };
 
 #endif // CREATURE_H

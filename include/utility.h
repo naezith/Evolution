@@ -57,4 +57,10 @@ static sf::Vector2f normalize(const sf::Vector2f& a) {
     return a / mag;
 }
 
+static std::string setPrecision(float num, int precision = 0) {
+    std::stringstream ss;
+    ss << std::fixed << std::setprecision(precision) << num;
+    return ss.str();
+}
+
 #endif // UTILITY_H

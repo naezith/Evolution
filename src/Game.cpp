@@ -8,10 +8,10 @@ void Game::init(float _dt) {
     setDeltaTime(_dt);
     m_view_size = sf::Vector2f(1280, 720);
     m_font.loadFromFile("resources/Ubuntu-C.ttf");
-    viewDimensions.y = 50.0f;
+    viewDimensions.y = 15.0f;
     viewDimensions.x = viewDimensions.y*m_view_size.x/m_view_size.y;
 
-    view.reset(sf::FloatRect(0.0f, m_view_size.y - viewDimensions.y, viewDimensions.x, viewDimensions.y));
+    view.reset(sf::FloatRect(-viewDimensions.x*0.5f, m_view_size.y - viewDimensions.y, viewDimensions.x, viewDimensions.y));
     view.setViewport(sf::FloatRect(0,0,1,1));
     //view.zoom(1.5);
     m_window.setView(view);
@@ -60,32 +60,36 @@ void Game::run() {
     sf::Clock clock;
 
     while(m_window.isOpen()){
-        // Check events
-        sf::Event event;
-        while(m_window.pollEvent(event)){
-            if(event.type == sf::Event::Closed) {
-                m_window.close();
+        double elapsed = clock.restart().asSeconds();
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::H)) update(); // Just simulate as fast as possible
+        else {
+            // Update
+            if(sf::Keyboard::isKeyPressed(sf::Keyboard::K)) elapsed *= 4.0; // Simulate 4x
+            m_accumulator += elapsed;
+
+            // Check events
+            sf::Event event;
+            while(m_window.pollEvent(event)){
+                if(event.type == sf::Event::Closed) {
+                    m_window.close();
+                }
             }
+            while(m_accumulator > m_dt){
+                m_accumulator -= m_dt;
+
+                update();
+            }
+
+            // Render
+            render();
         }
-
-        // Update
-        m_accumulator += clock.restart().asSeconds();
-        while(m_accumulator > m_dt){
-            m_accumulator -= m_dt;
-
-            update();
-        }
-
-        // Render
-        render();
     }
 }
 
 void Game::spawnCreature() {
     //if(m_creatures.size() > 0) return;
     m_creatures.emplace_back();
-    m_creatures.back().init(m_world.get(), sf::Vector2f(viewDimensions.x*0.5f + random_float(-5.0f, 5.0f),
-                                        m_view_size.y - 50.0f + random_float(-5.0f, 5.0f)));
+    m_creatures.back().init(m_world.get(), sf::Vector2f(0, m_view_size.y - viewDimensions.y*0.3));
 }
 
 void Game::update() {
@@ -99,6 +103,15 @@ void Game::update() {
     }
 
     m_world->Step(m_dt, 6, 2);
+
+    // Put camera on best creature
+    best_x = 0.0f;
+    for(unsigned i = 0; i < m_creatures.size(); ++i) {
+        float dist = m_creatures[i].getPosition().x;
+        if(dist > best_x) best_x = dist;
+    }
+    view.reset(sf::FloatRect(best_x - viewDimensions.x*0.9f, m_view_size.y - viewDimensions.y, viewDimensions.x, viewDimensions.y));
+    m_window.setView(view);
 }
 
 void Game::render() {
@@ -106,11 +119,59 @@ void Game::render() {
     m_window.setView(view);
     sf::VertexArray va(sf::Quads);
 
+    // Draw background lines
+    sf::Text text;
+    text.setFont(m_font);
+    text.setCharacterSize(12);
+    text.setColor(sf::Color::Black);
+    float scale = viewDimensions.y/m_view_size.y;
+    text.setScale(scale, scale);
 
+    sf::RectangleShape text_back(sf::Vector2f(0.7, 0.3));
+    text_back.setOrigin(text_back.getSize()*0.5f);
+
+    sf::RectangleShape line(sf::Vector2f(0.025, 4.0));
+    line.setOrigin(line.getSize().x*0.5f, line.getSize().y);
+    for(int i = -30; i <= 30; ++i) {
+        line.setPosition(i, groundBody->GetPosition().y);
+        m_window.draw(line);
+
+        text.setString(std::to_string(i) + " m");
+        text.setOrigin(text.getGlobalBounds().width*0.5f, text.getGlobalBounds().height*0.5f);
+        text.setPosition(i - text.getCharacterSize()*0.01f, line.getPosition().y - line.getSize().y);
+
+        text_back.setPosition(i, text.getGlobalBounds().top + text.getGlobalBounds().height*0.5f);
+        m_window.draw(text_back);
+        m_window.draw(text);
+    }
+
+    // Show the best
+    text.setString(setPrecision(best_x, 2) + " m");
+    text.setOrigin(text.getGlobalBounds().width*0.5f, text.getGlobalBounds().height*0.5f);
+    text.setPosition(best_x - text.getCharacterSize()*0.01f, text.getPosition().y - 1);
+    text_back.setPosition(best_x, text.getGlobalBounds().top + text.getGlobalBounds().height*0.5f);
+    text_back.setSize(sf::Vector2f(text_back.getSize().x*2.0, text_back.getSize().y));
+    text_back.setOrigin(text_back.getSize()*0.5f);
+    m_window.draw(text_back);
+    m_window.draw(text);
+
+    // Show the timer
+    text.setString("Time: " + setPrecision(m_global_timer, 2) + " sec");
+    text.setOrigin(0, 0);
+    text.setPosition(best_x, text.getPosition().y - 1);
+    text_back.setPosition(best_x, text.getGlobalBounds().top + text.getGlobalBounds().height*0.5f);
+    text_back.setSize(sf::Vector2f(text_back.getSize().x*1.4, text_back.getSize().y));
+    text_back.setOrigin(0.2, text_back.getSize().y*0.5f);
+    m_window.draw(text_back);
+    m_window.draw(text);
+
+
+    // Draw Creatures
     for(unsigned i = 0; i < m_creatures.size(); ++i) {
         m_creatures[i].render(m_window);
     }
 
+    // Draw ground
     drawRect(va, groundBody, groundFixture, groundDim, sf::Color(0, 104, 10));
 
     m_window.draw(va);
