@@ -11,6 +11,10 @@ constexpr float SIN45 = 0.70710678118; //Sinus of 45 degrees, also length of uni
 constexpr float PI = 3.14159265359;
 
 static std::mt19937 mt(1337);
+static int random_int(int lower, int higher) {
+    std::uniform_int_distribution<int> dist(lower, higher);
+    return dist(mt);
+}
 static float random_float(float lower, float higher) {
     std::uniform_real_distribution<float> dist(lower, higher);
     return dist(mt);

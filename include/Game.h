@@ -25,7 +25,7 @@ class Game {
 
 
         void drawRect(sf::VertexArray& va, b2Body* b, b2Fixture* f, const sf::Vector2f& dim, const sf::Color& c = sf::Color::Magenta);
-        void spawnBox();
+        void spawnCreature();
     private:
         float m_accumulator = 0.0f;
         float m_dt = 1 / 125.0f;

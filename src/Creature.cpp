@@ -5,30 +5,69 @@ Creature::Creature() {
 }
 
 void Creature::init(b2World* world, const sf::Vector2f& pos) {
-    Node* prev = nullptr;
-    for(int i = 0; i < 2; ++i) {
-        nodes.emplace_back();
+    this->world = world;
 
-        sf::Vector2f offset(random_float(0, i), random_float(0, i));
-        nodes.back().init(world, pos + offset, i*0.25);
+    heart_beat = random_float(0.1, 1.1);
+    // Create the first node
+    nodes.emplace_back();
+    nodes.back().init(world, pos, random_float(0, 1));
 
-        if(prev != nullptr) {
-            b2DistanceJointDef jointDef;
-            Node* a = prev;
-            Node* b = &nodes.back();
-            jointDef.bodyA = a->body;
-            jointDef.bodyB = b->body;
+    int node_count = random_int(2, 3);
+    for(int i = 0; i < node_count; ++i) addRandomNode();
+}
 
-            sf::Vector2f a2b = normalize(offset)*a->shape.m_radius;
-            jointDef.localAnchorA = b2Vec2( a2b.x,  a2b.y);
-            jointDef.localAnchorB = b2Vec2(-a2b.x, -a2b.y);
-            jointDef.collideConnected = false;
-            jointDef.frequencyHz = 0;
-            muscles.push_back(Muscle(world, jointDef, 3.0, 6.0, 0.3, 0.7, 10));
+void Creature::addRandomNode() {
+    if(nodes.empty()) return;
+
+    // Add New node
+    int parent = random_int(0, nodes.size()-1);
+    nodes.emplace_back();
+    Node& new_node = nodes.back();
+
+    float dist = 6;
+    sf::Vector2f offset(random_float(-dist, dist), random_float(-dist, dist));
+    new_node.init(world, nodes[parent].getPosition() + offset,
+                  random_float(0, 1)); // Friction
+
+    addMuscle(&nodes[parent], &new_node);
+
+    // Connect one more muscle to the closest node
+    unsigned closest_id = -1;
+    float shortest_dist = 999999999;
+    for(unsigned i = 0; i < nodes.size() - 1; ++i) {
+        if(i == parent) continue;
+
+        float dist = magnitude(new_node.getPosition() - nodes[i].getPosition());
+        if(dist < shortest_dist) {
+            shortest_dist = dist;
+            closest_id = i;
         }
-
-        prev = &nodes.back();
     }
+
+    if(closest_id != -1) addMuscle(&nodes[closest_id], &new_node);
+}
+
+void Creature::addMuscle(Node* a, Node* b) {
+    b2DistanceJointDef jointDef;
+    jointDef.bodyA = a->body;
+    jointDef.bodyB = b->body;
+
+    sf::Vector2f dist_vec = b->getPosition() - a->getPosition();
+    float dist = magnitude(dist_vec);
+
+    sf::Vector2f a2b = normalize(dist_vec)*a->shape.m_radius;
+    jointDef.localAnchorA = b2Vec2( a2b.x,  a2b.y);
+    jointDef.localAnchorB = b2Vec2(-a2b.x, -a2b.y);
+    jointDef.collideConnected = false;
+    jointDef.frequencyHz = 0;
+
+    float ratio = random_float(0.01, 0.2);
+    muscles.push_back(Muscle(world, jointDef,
+                             dist*(1.0f - ratio), // Short length
+                             dist*(1.0f + ratio), // Long length
+                             random_float(0, 1), // Extend time
+                             random_float(0, 1), // Contract time
+                             random_float(3, 12))); // Strength
 }
 
 void Creature::update(float dt) {
@@ -47,6 +86,8 @@ void Creature::render(sf::RenderTarget& rt) {
 
 
 
+const float MIN_STRENGTH = 3.0f;
+const float MAX_STRENGTH = 12.0f;
 
 Muscle::Muscle(b2World* world, b2DistanceJointDef& def,
                float short_len_, float long_len_,
@@ -58,6 +99,9 @@ Muscle::Muscle(b2World* world, b2DistanceJointDef& def,
     target_len = &short_len;
     joint = (b2DistanceJoint*) world->CreateJoint( &def );
     joint->SetLength(long_len);
+
+    float d = (strength-MIN_STRENGTH) / (MAX_STRENGTH - MIN_STRENGTH);
+    c = sf::Color(255 - (255-0)*d, 255 - (255-0)*d, 255 - (255-0)*d);
 }
 
 void Muscle::update(float c_time, float dt) {
@@ -77,7 +121,7 @@ void Muscle::render(sf::RenderTarget& rt) {
     rect.setOrigin(rect.getSize().x*0.5f, rect.getSize().y);
     rect.setPosition(a);
     rect.rotate(vecToAngle(b-a));
-    rect.setFillColor(sf::Color(30, 30, 30));
+    rect.setFillColor(c);
 
     rt.draw(rect);
 }
@@ -112,7 +156,12 @@ void Node::init(b2World* world, const sf::Vector2f& pos, float friction) {
     fixture_def.filter = filter;
     body->CreateFixture(&fixture_def); //add a fixture to the body
     setPosition(pos);
-    c = sf::Color(random_float(0, 255), random_float(0, 255), random_float(0, 255));
+    float d = fixture_def.friction;
+    c = sf::Color(255 - (255-139)*d, 255 - (255-0)*d, 255 - (255-0)*d);
+}
+
+sf::Vector2f Node::getPosition() const {
+    return sf::Vector2f(body->GetPosition().x, body->GetPosition().y);
 }
 
 void Node::setPosition(const sf::Vector2f& pos) {

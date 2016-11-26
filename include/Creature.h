@@ -22,6 +22,7 @@ class Muscle {
         float contract_time = 0.25f;
 
         float strength = 1.0f;
+        sf::Color c;
 };
 
 class Node{
@@ -30,6 +31,7 @@ class Node{
         virtual ~Node();
 
         void init(b2World* world, const sf::Vector2f& pos, float friction);
+        sf::Vector2f getPosition() const;
         void setPosition(const sf::Vector2f& pos);
         void render(sf::RenderTarget& rt);
         sf::Color c;
@@ -46,11 +48,18 @@ class Creature {
         void init(b2World* world, const sf::Vector2f& pos);
         void update(float dt);
         void render(sf::RenderTarget& rt);
+
+
+        void addRandomNode();
+        void addMuscle(Node* a, Node* b);
+
         std::vector<Node> nodes;
         std::vector<Muscle> muscles;
 
         float timer = 0.0f;
         float heart_beat = 0.5f;
+
+        b2World* world;
 };
 
 #endif // CREATURE_H

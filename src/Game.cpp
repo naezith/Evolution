@@ -33,9 +33,7 @@ void Game::init(float _dt) {
     groundFixture = groundBody->CreateFixture(&groundBox, 0.0f);
     groundFixture->SetFriction(1.0);
 
-    for(int i = 0; i < 2; ++i) {
-        spawnBox();
-    }
+    spawnCreature();
 }
 
 void Game::drawRect(sf::VertexArray& va, b2Body* b, b2Fixture* f, const sf::Vector2f& dim, const sf::Color& c) {
@@ -83,7 +81,7 @@ void Game::run() {
     }
 }
 
-void Game::spawnBox() {
+void Game::spawnCreature() {
     //if(m_creatures.size() > 0) return;
     m_creatures.emplace_back();
     m_creatures.back().init(m_world.get(), sf::Vector2f(viewDimensions.x*0.5f + random_float(-5.0f, 5.0f),
@@ -94,7 +92,7 @@ void Game::update() {
     m_global_timer += m_dt;
 
     if(sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
-        spawnBox();
+        spawnCreature();
     }
     for(unsigned i = 0; i < m_creatures.size(); ++i) {
         m_creatures[i].update(m_dt);
@@ -104,7 +102,7 @@ void Game::update() {
 }
 
 void Game::render() {
-    m_window.clear(sf::Color::White);
+    m_window.clear(sf::Color(135, 206, 250));
     m_window.setView(view);
     sf::VertexArray va(sf::Quads);
 
@@ -113,7 +111,7 @@ void Game::render() {
         m_creatures[i].render(m_window);
     }
 
-    drawRect(va, groundBody, groundFixture, groundDim, sf::Color::Green);
+    drawRect(va, groundBody, groundFixture, groundDim, sf::Color(0, 104, 10));
 
     m_window.draw(va);
 
