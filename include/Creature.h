@@ -60,6 +60,7 @@ class Creature {
         float heart_beat = 0.5f;
 
         b2World* world;
+        float fitness = 0.0f;
     private:
         sf::Vector2f pos;
 };

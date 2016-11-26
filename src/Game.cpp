@@ -90,28 +90,35 @@ void Game::spawnCreature() {
     //if(m_creatures.size() > 0) return;
     m_creatures.emplace_back();
     m_creatures.back().init(m_world.get(), sf::Vector2f(0, m_view_size.y - viewDimensions.y*0.3));
+    curr_creature_id = m_creatures.size()-1;
+    m_global_timer = 0.0f;
 }
 
 void Game::update() {
     m_global_timer += m_dt;
 
-    if(sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
-        spawnCreature();
-    }
-    for(unsigned i = 0; i < m_creatures.size(); ++i) {
-        m_creatures[i].update(m_dt);
-    }
+    m_creatures[curr_creature_id].update(m_dt);
 
     m_world->Step(m_dt, 6, 2);
 
     // Put camera on best creature
-    best_x = 0.0f;
+    /*best_x = 0.0f;
     for(unsigned i = 0; i < m_creatures.size(); ++i) {
         float dist = m_creatures[i].getPosition().x;
         if(dist > best_x) best_x = dist;
+    }*/
+    best_x = m_creatures[curr_creature_id].fitness;
+    if(best_x > overall_best_x) {
+        overall_best_id = curr_creature_id;
+        overall_best_x = best_x;
     }
-    view.reset(sf::FloatRect(best_x - viewDimensions.x*0.9f, m_view_size.y - viewDimensions.y, viewDimensions.x, viewDimensions.y));
+    view.reset(sf::FloatRect(best_x - viewDimensions.x*0.5f, m_view_size.y - viewDimensions.y, viewDimensions.x, viewDimensions.y));
     m_window.setView(view);
+
+    // Create new creature after a while
+    if(m_global_timer > 20.0f) {
+        spawnCreature();
+    }
 }
 
 void Game::render() {
@@ -165,11 +172,20 @@ void Game::render() {
     m_window.draw(text_back);
     m_window.draw(text);
 
+    // Show the overall best
+    text.setString("Current Creature: #" + std::to_string(curr_creature_id) + "           Best creature: #" + std::to_string(overall_best_id) + "       " + setPrecision(overall_best_x, 2) + " m");
+    text.setOrigin(text.getGlobalBounds().width*0.5f, text.getGlobalBounds().height*0.5f);
+    text.setPosition(best_x - text.getCharacterSize()*0.01f - 1, text.getPosition().y - 1);
+    text_back.setPosition(best_x - 1, text.getGlobalBounds().top + text.getGlobalBounds().height*0.5f);
+    text_back.setSize(sf::Vector2f(text_back.getSize().x*3.0, text_back.getSize().y));
+    text_back.setOrigin(0.2, text_back.getSize().y*0.5f);
+    m_window.draw(text_back);
+    m_window.draw(text);
+
 
     // Draw Creatures
-    for(unsigned i = 0; i < m_creatures.size(); ++i) {
-        m_creatures[i].render(m_window);
-    }
+    m_creatures[curr_creature_id].render(m_window);
+
 
     // Draw ground
     drawRect(va, groundBody, groundFixture, groundDim, sf::Color(0, 104, 10));

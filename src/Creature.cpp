@@ -82,6 +82,9 @@ void Creature::update(float dt) {
         sum += nodes[i].getPosition();
     }
     pos = sum / (float) nodes.size();
+
+    // His distance is his fitness
+    if(pos.x > fitness) fitness = pos.x;
 }
 
 void Creature::render(sf::RenderTarget& rt) {

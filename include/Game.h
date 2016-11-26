@@ -47,6 +47,11 @@ class Game {
         sf::Vector2f viewDimensions;
 
         float best_x = 0.0f;
+        unsigned overall_best_id = 0;
+        float overall_best_x = 0.0f;
+        // Genetic Algorithm
+        unsigned gen = 1;
+        unsigned curr_creature_id = 0;
 };
 
 #endif // GAME_H
