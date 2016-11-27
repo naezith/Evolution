@@ -63,4 +63,9 @@ static std::string setPrecision(float num, int precision = 0) {
     return ss.str();
 }
 
+template <typename T>
+static bool contains(std::vector<T>& vec, T elem){
+    return std::find(vec.begin(), vec.end(), elem) != vec.end();
+}
+
 #endif // UTILITY_H

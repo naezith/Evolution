@@ -26,6 +26,7 @@ class Game {
 
         void drawRect(sf::VertexArray& va, b2Body* b, b2Fixture* f, const sf::Vector2f& dim, const sf::Color& c = sf::Color::Magenta);
         void spawnCreature();
+        sf::Vector2f getSpawnPos();
     private:
         float m_accumulator = 0.0f;
         float m_dt = 1 / 125.0f;
@@ -38,7 +39,7 @@ class Game {
         sf::View view;
         b2Vec2 gravity;
         std::unique_ptr<b2World> m_world;
-        std::vector<Creature> m_creatures;
+        std::vector<std::unique_ptr<Creature>> m_creatures;
 
         b2Body* groundBody;
         b2Fixture* groundFixture;

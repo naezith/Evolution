@@ -1,24 +1,145 @@
 #include "Creature.h"
 #include "utility.h"
 
+/// CREATURE
 Creature::Creature() {
 }
 
-void Creature::init(b2World* world_, const sf::Vector2f& pos) {
+void Creature::init(b2World* world_, const sf::Vector2f& position) {
     world = world_;
 
     heart_beat = random_float(0.1, 1.1);
     // Create the first node
     nodes.push_back(std::make_unique<Node>());
-    nodes.back()->init(world, pos, random_float(0, 1));
+    nodes.back()->init(world, sf::Vector2f(0,0), random_float(0, 1));
 
     int node_count = random_int(2, 3);
     for(int i = 0; i < node_count; ++i) addRandomNode();
 
+    setPosition(position);
     setActive(false);
 }
 
+void Creature::setPosition(const sf::Vector2f& position) {
+    updatePosition(); // Update the current center
+    sf::Vector2f move_vec = position - pos;
+
+    // Move all nodes
+    for(unsigned i = 0; i < nodes.size(); ++i)
+        nodes[i]->setPosition(nodes[i]->getPosition() + move_vec);
+
+    pos = position; // Center is changed
+}
+
+std::unique_ptr<Creature> Creature::copy() {
+    std::unique_ptr<Creature> copied = std::make_unique<Creature>();
+    copied->heart_beat = heart_beat;
+
+    for(unsigned i = 0; i < nodes.size(); ++i)
+        copied->nodes.push_back(nodes[i]->copy());
+
+    for(unsigned i = 0; i < muscles.size(); ++i)
+        copied->muscles.push_back(muscles[i]->copy());
+
+    copied->setActive(false);
+    return std::move(copied);
+}
+
+std::unique_ptr<Creature> Creature::mutatedCopy() {
+    std::unique_ptr<Creature> mutated = std::make_unique<Creature>();
+    mutated->world = world;
+    mutated->heart_beat = heart_beat + random_float(-0.1, 0.1);
+
+    for(unsigned i = 0; i < nodes.size(); ++i)
+        mutated->nodes.push_back(nodes[i]->mutatedCopy());
+
+    for(unsigned i = 0; i < muscles.size(); ++i)
+        mutated->muscles.push_back(muscles[i]->mutatedCopy());
+
+    if(random_int(0, 100) < 5) mutated->addRandomNode();
+    if(random_int(0, 100) < 5) mutated->addMuscle();
+
+    // Remove random node
+    if(random_int(0, 100) < 5) mutated->removeRandomNode();
+
+    // Remove random muscle
+    if(random_int(0, 100) < 5) mutated->removeRandomMuscle();
+
+    // Last checks
+    mutated->checkMuscleOverlap();
+    mutated->checkLoneNodes();
+    mutated->setActive(false);
+
+    return std::move(mutated);
+}
+
 const float NODE_DIST = 1.5f;
+void Creature::removeRandomNode() {
+    if(nodes.size() > 3) {
+        int victim_id = random_int(0, muscles.size() - 1);
+        Node* victim = nodes[victim_id].get();
+
+        // Remove the muscles which hold this node
+        for(unsigned i = 0; i < muscles.size(); ++i) {
+            if(muscles[i]->a == victim || muscles[i]->b == victim)
+                muscles.erase(muscles.begin() + i);
+        }
+
+        nodes.erase(nodes.begin() + victim_id);
+    }
+}
+
+void Creature::removeRandomMuscle() {
+    if(muscles.size() > 1) muscles.erase(muscles.begin() + random_int(0, muscles.size() - 1));
+}
+
+void Creature::checkMuscleOverlap() {
+    std::vector<Muscle*> muscles_to_remove;
+    for(unsigned i = 0; i < muscles.size(); ++i) {
+        for(unsigned j = i + 1; j < muscles.size(); ++j) {
+            Muscle* first = muscles[i].get();
+            Muscle* second = muscles[j].get();
+            if((first->a == second->a && first->b == second->b) ||
+               (first->a == second->b && first->b == second->a) ||
+               (first->a == first->b)) {
+                   if(!contains(muscles_to_remove, first)) muscles_to_remove.push_back(first);
+            }
+        }
+    }
+}
+
+void Creature::checkLoneNodes() {
+    if(nodes.size() >= 3) {
+        for(unsigned i = 0; i < nodes.size(); ++i) {
+            Node* n = nodes[i].get();
+            unsigned connected_node_count = 0;
+            Node* connected_node = nullptr;
+
+            // Find connected nodes
+            for(unsigned j = 0; j < muscles.size(); ++j) {
+                Muscle* musc = muscles[j].get();
+                if(musc->a == n) {
+                    ++connected_node_count;
+                    connected_node = musc->b;
+                }
+                else if(musc->b == n) {
+                    ++connected_node_count;
+                    connected_node = musc->b;
+                }
+            }
+
+            // Get some friends
+            if(connected_node_count < 1) {
+                unsigned buddy;
+                do { buddy = random_int(0, nodes.size() - 1);
+                } while(buddy == i || nodes[i].get() == connected_node); // It's me or someone who is already a friend
+
+                addMuscle(nodes[i].get(), nodes[buddy].get());
+            }
+        }
+    }
+}
+
 void Creature::addRandomNode() {
     if(nodes.empty()) return;
 
@@ -49,6 +170,18 @@ void Creature::addRandomNode() {
 }
 
 void Creature::addMuscle(Node* a, Node* b) {
+    // Pick random two nodes
+    if(a == nullptr) {
+        if(nodes.size() < 3) return;
+
+        a = b = nodes[random_int(0, nodes.size() - 1)].get();
+
+        while(a == b) {
+            b = nodes[random_int(0, nodes.size() - 1)].get();
+        }
+    }
+
+    // Create the muscle
     float ratio = random_float(0.01, 0.2);
     muscles.push_back(std::make_unique<Muscle>());
     float dist = magnitude(b->getPosition() - a->getPosition());
@@ -60,6 +193,12 @@ void Creature::addMuscle(Node* a, Node* b) {
                              random_float(3, 12)); // Strength
 }
 
+void Creature::updatePosition() {
+    sf::Vector2f sum(0, 0);
+    for(unsigned i = 0; i < nodes.size(); ++i) sum += nodes[i]->getPosition();
+    pos = sum / (float) nodes.size();
+}
+
 void Creature::update(float dt) {
     if((timer += dt) > heart_beat) timer = 0;
     for(unsigned i = 0; i < muscles.size(); ++i) {
@@ -67,11 +206,7 @@ void Creature::update(float dt) {
     }
 
     // Set position to center of nodes
-    sf::Vector2f sum(0, 0);
-    for(unsigned i = 0; i < nodes.size(); ++i) {
-        sum += nodes[i]->getPosition();
-    }
-    pos = sum / (float) nodes.size();
+    updatePosition();
 
     // His distance is his fitness
     if(pos.x > fitness) fitness = pos.x;
@@ -84,7 +219,6 @@ void Creature::setActive(bool active) {
 
 void Creature::render(sf::RenderTarget& rt) {
     for(unsigned i = 0; i < muscles.size(); ++i) muscles[i]->render(rt);
-
     for(unsigned i = 0; i < nodes.size(); ++i) nodes[i]->render(rt);
 }
 
@@ -95,6 +229,7 @@ const float MIN_STRENGTH = 3.0f;
 const float MAX_STRENGTH = 12.0f;
 const float MUSCLE_THICKNESS = 0.2f;
 
+/// MUSCLE
 Muscle::Muscle(){}
 
 Muscle::~Muscle() {
@@ -135,6 +270,12 @@ void Muscle::init(b2World* world_, Node* a_, Node* b_,
 
     float d = (strength-MIN_STRENGTH) / (MAX_STRENGTH - MIN_STRENGTH);
     c = sf::Color(255 - (255-0)*d, 255 - (255-0)*d, 255 - (255-0)*d);
+}
+
+std::unique_ptr<Muscle> Muscle::copy() {
+    std::unique_ptr<Muscle> copied = std::make_unique<Muscle>();
+    copied->init(world, a, b, short_len, long_len, extend_time, contract_time, strength);
+    return std::move(copied);
 }
 
 std::unique_ptr<Muscle> Muscle::mutatedCopy() {
@@ -185,7 +326,7 @@ void Muscle::render(sf::RenderTarget& rt) {
 
 
 
-
+/// NODE
 Node::Node(){
 }
 
@@ -200,6 +341,12 @@ std::unique_ptr<Node> Node::mutatedCopy() {
                                       getPosition().y + 0.33f*random_float(NODE_DIST, NODE_DIST)),
                  std::min(std::max(fixture_def.friction + random_float(-0.1, 0.1), 0.0f), 1.0f));
     return std::move(mutated);
+}
+
+std::unique_ptr<Node> Node::copy() {
+    std::unique_ptr<Node> copied = std::make_unique<Node>();
+    copied->init(world, getPosition(), fixture_def.friction);
+    return std::move(copied);
 }
 
 void Node::init(b2World* world_, const sf::Vector2f& pos, float friction) {

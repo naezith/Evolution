@@ -9,13 +9,14 @@ class Node;
 class Muscle {
     public:
         Muscle();
-        ~Muscle();
+        virtual ~Muscle();
 
         void init(b2World* world_, Node* a_, Node* b_, float short_len_, float long_len_,
                float extend_time_, float contract_time_, float strength_);
         void update(float c_time, float dt);
         void setActive(bool active);
         void render(sf::RenderTarget& rt);
+        std::unique_ptr<Muscle> copy();
         std::unique_ptr<Muscle> mutatedCopy();
 
         b2DistanceJoint* joint = nullptr;
@@ -36,13 +37,14 @@ class Muscle {
 class Node{
     public:
         Node();
-        ~Node();
+        virtual ~Node();
 
         void init(b2World* world_, const sf::Vector2f& pos, float friction);
         void setActive(bool active);
         sf::Vector2f getPosition() const;
         void setPosition(const sf::Vector2f& pos);
         void render(sf::RenderTarget& rt);
+        std::unique_ptr<Node> copy();
         std::unique_ptr<Node> mutatedCopy();
 
         sf::Color c;
@@ -57,15 +59,22 @@ class Creature {
     public:
         Creature();
 
-        void init(b2World* world_, const sf::Vector2f& pos);
+        void init(b2World* world_, const sf::Vector2f& position);
+        void updatePosition();
+        void setPosition(const sf::Vector2f& position);
         void update(float dt);
         void render(sf::RenderTarget& rt);
         const sf::Vector2f& getPosition() const { return pos; };
 
         void addRandomNode();
-        void addMuscle(Node* a, Node* b);
+        void addMuscle(Node* a = nullptr, Node* b = nullptr);
         void setActive(bool active);
-        Creature mutatedCopy();
+        std::unique_ptr<Creature> copy();
+        std::unique_ptr<Creature> mutatedCopy();
+        void removeRandomNode();
+        void removeRandomMuscle();
+        void checkMuscleOverlap();
+        void checkLoneNodes();
 
         std::vector<std::unique_ptr<Node>> nodes;
         std::vector<std::unique_ptr<Muscle>> muscles;
