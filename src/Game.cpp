@@ -13,8 +13,6 @@ void Game::init(float _dt) {
 
     view.reset(sf::FloatRect(-viewDimensions.x*0.5f, m_view_size.y - viewDimensions.y, viewDimensions.x, viewDimensions.y));
     view.setViewport(sf::FloatRect(0,0,1,1));
-    //view.zoom(1.5);
-    m_window.setView(view);
 
     gravity = b2Vec2(0.0f, 9.81);
     m_world = std::make_unique<b2World>(gravity);
@@ -88,7 +86,6 @@ void Game::run() {
 }
 
 void Game::spawnCreature() {
-    //if(m_creatures.size() > 0) return;
     m_creatures.emplace_back();
     m_creatures.back().init(m_world.get(), sf::Vector2f(0, m_view_size.y - viewDimensions.y*0.3));
 }
@@ -181,7 +178,9 @@ void Game::render() {
     m_window.draw(text);
 
     // Show the overall best
-    text.setString("Current Creature: #" + std::to_string(curr_creature_id) + "           Best creature: #" + std::to_string(overall_best_id) + "       " + setPrecision(overall_best_x, 2) + " m");
+    text.setString("Current Creature: #" + std::to_string(curr_creature_id + 1) +
+                   "           Best creature: #" + std::to_string(overall_best_id + 1) +
+                   "       " + setPrecision(overall_best_x, 2) + " m");
     text.setOrigin(text.getGlobalBounds().width*0.5f, text.getGlobalBounds().height*0.5f);
     text.setPosition(best_x - text.getCharacterSize()*0.01f - 1, text.getPosition().y - 1);
     text_back.setPosition(best_x - 1, text.getGlobalBounds().top + text.getGlobalBounds().height*0.5f);

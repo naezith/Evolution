@@ -4,13 +4,13 @@
 Creature::Creature() {
 }
 
-void Creature::init(b2World* world, const sf::Vector2f& pos) {
-    this->world = world;
+void Creature::init(b2World* world_, const sf::Vector2f& pos) {
+    world = world_;
 
     heart_beat = random_float(0.1, 1.1);
     // Create the first node
-    nodes.emplace_back();
-    nodes.back().init(world, pos, random_float(0, 1));
+    nodes.push_back(std::make_unique<Node>());
+    nodes.back()->init(world, pos, random_float(0, 1));
 
     int node_count = random_int(2, 3);
     for(int i = 0; i < node_count; ++i) addRandomNode();
@@ -18,20 +18,19 @@ void Creature::init(b2World* world, const sf::Vector2f& pos) {
     setActive(false);
 }
 
+const float NODE_DIST = 1.5f;
 void Creature::addRandomNode() {
     if(nodes.empty()) return;
 
     // Add New node
     int parent = random_int(0, nodes.size()-1);
-    nodes.emplace_back();
-    Node& new_node = nodes.back();
-
-    float dist = 1.5;
-    sf::Vector2f offset(random_float(-dist, dist), random_float(-dist, dist));
-    new_node.init(world, nodes[parent].getPosition() + offset,
+    sf::Vector2f offset(random_float(-NODE_DIST, NODE_DIST), random_float(-NODE_DIST, NODE_DIST));
+    nodes.push_back(std::make_unique<Node>());
+    Node* new_node = nodes.back().get();
+    new_node->init(world, nodes[parent]->getPosition() + offset,
                   random_float(0, 1)); // Friction
 
-    addMuscle(&nodes[parent], &new_node);
+    addMuscle(nodes[parent].get(), new_node);
 
     // Connect one more muscle to the closest node
     unsigned closest_id = -1;
@@ -39,50 +38,38 @@ void Creature::addRandomNode() {
     for(unsigned i = 0; i < nodes.size() - 1; ++i) {
         if(i == parent) continue;
 
-        float dist = magnitude(new_node.getPosition() - nodes[i].getPosition());
+        float dist = magnitude(new_node->getPosition() - nodes[i]->getPosition());
         if(dist < shortest_dist) {
             shortest_dist = dist;
             closest_id = i;
         }
     }
 
-    if(closest_id != -1) addMuscle(&nodes[closest_id], &new_node);
+    if(closest_id != -1) addMuscle(nodes[closest_id].get(), new_node);
 }
 
 void Creature::addMuscle(Node* a, Node* b) {
-    b2DistanceJointDef jointDef;
-    jointDef.bodyA = a->body;
-    jointDef.bodyB = b->body;
-    if(jointDef.bodyA == nullptr || jointDef.bodyB == nullptr) return;
-
-    sf::Vector2f dist_vec = b->getPosition() - a->getPosition();
-    float dist = magnitude(dist_vec);
-
-    sf::Vector2f a2b = normalize(dist_vec)*a->shape.m_radius;
-    jointDef.localAnchorA = b2Vec2( a2b.x,  a2b.y);
-    jointDef.localAnchorB = b2Vec2(-a2b.x, -a2b.y);
-    jointDef.collideConnected = false;
-    jointDef.frequencyHz = 0;
-
     float ratio = random_float(0.01, 0.2);
-    muscles.push_back(Muscle(world, jointDef,
+    muscles.push_back(std::make_unique<Muscle>());
+    float dist = magnitude(b->getPosition() - a->getPosition());
+    muscles.back()->init(world, a, b,
                              dist*(1.0f - ratio), // Short length
                              dist*(1.0f + ratio), // Long length
                              random_float(0, 1), // Extend time
                              random_float(0, 1), // Contract time
-                             random_float(3, 12))); // Strength
+                             random_float(3, 12)); // Strength
 }
 
 void Creature::update(float dt) {
     if((timer += dt) > heart_beat) timer = 0;
     for(unsigned i = 0; i < muscles.size(); ++i) {
-        muscles[i].update(timer/heart_beat, dt);
+        muscles[i]->update(timer/heart_beat, dt);
     }
 
     // Set position to center of nodes
     sf::Vector2f sum(0, 0);
     for(unsigned i = 0; i < nodes.size(); ++i) {
-        sum += nodes[i].getPosition();
+        sum += nodes[i]->getPosition();
     }
     pos = sum / (float) nodes.size();
 
@@ -91,14 +78,14 @@ void Creature::update(float dt) {
 }
 
 void Creature::setActive(bool active) {
-    for(unsigned i = 0; i < nodes.size(); ++i) nodes[i].setActive(active);
-    for(unsigned i = 0; i < muscles.size(); ++i) muscles[i].setActive(active);
+    for(unsigned i = 0; i < nodes.size(); ++i) nodes[i]->setActive(active);
+    for(unsigned i = 0; i < muscles.size(); ++i) muscles[i]->setActive(active);
 }
 
 void Creature::render(sf::RenderTarget& rt) {
-    for(unsigned i = 0; i < muscles.size(); ++i) muscles[i].render(rt);
+    for(unsigned i = 0; i < muscles.size(); ++i) muscles[i]->render(rt);
 
-    for(unsigned i = 0; i < nodes.size(); ++i) nodes[i].render(rt);
+    for(unsigned i = 0; i < nodes.size(); ++i) nodes[i]->render(rt);
 }
 
 
@@ -108,19 +95,59 @@ const float MIN_STRENGTH = 3.0f;
 const float MAX_STRENGTH = 12.0f;
 const float MUSCLE_THICKNESS = 0.2f;
 
-Muscle::Muscle(b2World* world, b2DistanceJointDef& def,
+Muscle::Muscle(){}
+
+Muscle::~Muscle() {
+    world->DestroyJoint(joint);
+    joint = nullptr;
+}
+
+void Muscle::init(b2World* world_, Node* a_, Node* b_,
                float short_len_, float long_len_,
                float extend_time_, float contract_time_,
-               float strength_) :
-        short_len(short_len_), long_len(long_len_), extend_time(extend_time_),
-        contract_time(contract_time_), strength(strength_){
-    def.length = long_len;
+               float strength_) {
+    a = a_;
+    b = b_;
+
+
+    b2DistanceJointDef jointDef;
+    jointDef.bodyA = a->body;
+    jointDef.bodyB = b->body;
+
+    sf::Vector2f a2b = normalize(b->getPosition() - a->getPosition())*a->shape.m_radius;
+    jointDef.localAnchorA = b2Vec2( a2b.x,  a2b.y);
+    jointDef.localAnchorB = b2Vec2(-a2b.x, -a2b.y);
+    jointDef.collideConnected = false;
+    jointDef.frequencyHz = 0;
+
+
+    short_len = short_len_;
+    long_len = long_len_;
+    extend_time = extend_time_;
+    contract_time = contract_time_;
+    strength = strength_;
+
+    world = world_;
+    jointDef.length = long_len;
     target_len = &short_len;
-    joint = (b2DistanceJoint*) world->CreateJoint( &def );
+    joint = (b2DistanceJoint*) world->CreateJoint( &jointDef );
     joint->SetLength(long_len);
 
     float d = (strength-MIN_STRENGTH) / (MAX_STRENGTH - MIN_STRENGTH);
     c = sf::Color(255 - (255-0)*d, 255 - (255-0)*d, 255 - (255-0)*d);
+}
+
+std::unique_ptr<Muscle> Muscle::mutatedCopy() {
+    std::unique_ptr<Muscle> mutated = std::make_unique<Muscle>();
+    float len1 = short_len + short_len*random_float(-0.2, 0.2);
+    float len2 = long_len  + long_len *random_float(-0.2, 0.2);
+    mutated->init(world, a, b,
+                     std::min(len1, len2), // Short length
+                     std::max(len1, len2), // Long length
+                     std::min(std::max(extend_time   + random_float(-0.2, 0.2), 0.0f), 1.0f), // Extend time
+                     std::min(std::max(contract_time + random_float(-0.2, 0.2), 0.0f), 1.0f), // Contract time
+                     strength + strength*random_float(-0.2, 0.2)); // Strength
+    return std::move(mutated);
 }
 
 void Muscle::update(float c_time, float dt) {
@@ -132,6 +159,7 @@ void Muscle::update(float c_time, float dt) {
 
     joint->SetLength(joint->GetLength() + strength*((*target_len) - joint->GetLength())*dt);
 }
+
 void Muscle::setActive(bool active) {
 
 }
@@ -162,10 +190,20 @@ Node::Node(){
 }
 
 Node::~Node() {
+    world->DestroyBody(body);
+    body = nullptr;
 }
 
+std::unique_ptr<Node> Node::mutatedCopy() {
+    std::unique_ptr<Node> mutated = std::make_unique<Node>();
+    mutated->init(world, sf::Vector2f(getPosition().x + 0.33f*random_float(NODE_DIST, NODE_DIST),
+                                      getPosition().y + 0.33f*random_float(NODE_DIST, NODE_DIST)),
+                 std::min(std::max(fixture_def.friction + random_float(-0.1, 0.1), 0.0f), 1.0f));
+    return std::move(mutated);
+}
 
-void Node::init(b2World* world, const sf::Vector2f& pos, float friction) {
+void Node::init(b2World* world_, const sf::Vector2f& pos, float friction) {
+    world = world_;
     body_def.type = b2_dynamicBody; //this will be a dynamic body
     body_def.position.Set(-10, 20); //a little to the left
     body_def.fixedRotation = true;
