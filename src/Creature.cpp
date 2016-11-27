@@ -5,6 +5,10 @@
 Creature::Creature() {
 }
 
+float r(){
+    return pow(random_float(-1, 1), 19);
+}
+
 void Creature::init(b2World* world_, const sf::Vector2f& position) {
     world = world_;
 
@@ -31,36 +35,22 @@ void Creature::setPosition(const sf::Vector2f& position) {
     pos = position; // Center is changed
 }
 
-std::unique_ptr<Creature> Creature::copy() {
-    std::unique_ptr<Creature> copied = std::make_unique<Creature>();
-    copied->heart_beat = heart_beat;
-
-    for(unsigned i = 0; i < nodes.size(); ++i)
-        copied->nodes.push_back(nodes[i]->copy());
-
-    for(unsigned i = 0; i < muscles.size(); ++i)
-        copied->muscles.push_back(muscles[i]->copy());
-
-    copied->setActive(false);
-    return std::move(copied);
-}
-
 std::unique_ptr<Creature> Creature::mutatedCopy() {
     std::unique_ptr<Creature> mutated = std::make_unique<Creature>();
     mutated->world = world;
-    mutated->heart_beat = heart_beat + random_float(-0.1, 0.1);
+    mutated->heart_beat = heart_beat + 0.2f*r();
 
     for(unsigned i = 0; i < nodes.size(); ++i)
         mutated->nodes.push_back(nodes[i]->mutatedCopy());
 
     for(unsigned i = 0; i < muscles.size(); ++i)
-        mutated->muscles.push_back(muscles[i]->mutatedCopy());
+        mutated->muscles.push_back(muscles[i]->mutatedCopy(mutated->nodes));
 
     if(random_int(0, 100) < 5) mutated->addRandomNode();
     if(random_int(0, 100) < 5) mutated->addMuscle();
 
     // Remove random node
-    if(random_int(0, 100) < 5) mutated->removeRandomNode();
+    //if(random_int(0, 100) < 5) mutated->removeRandomNode();
 
     // Remove random muscle
     if(random_int(0, 100) < 5) mutated->removeRandomMuscle();
@@ -77,12 +67,19 @@ const float NODE_DIST = 1.5f;
 void Creature::removeRandomNode() {
     if(nodes.size() > 3) {
         int victim_id = random_int(0, muscles.size() - 1);
-        Node* victim = nodes[victim_id].get();
 
         // Remove the muscles which hold this node
-        for(unsigned i = 0; i < muscles.size(); ++i) {
-            if(muscles[i]->a == victim || muscles[i]->b == victim)
+        int i = 0;
+        while(i < muscles.size()) {
+            if(muscles[i]->a == victim_id || muscles[i]->b == victim_id)
                 muscles.erase(muscles.begin() + i);
+            else ++i;
+        }
+
+        for(int i = 0; i < muscles.size(); i++){
+            Muscle* m = muscles[i].get();
+            if(m->a >= victim_id) m->a--;
+            if(m->b >= victim_id) m->b--;
         }
 
         nodes.erase(nodes.begin() + victim_id);
@@ -106,23 +103,31 @@ void Creature::checkMuscleOverlap() {
             }
         }
     }
+    for(unsigned i = 0; i < muscles_to_remove.size(); ++i) {
+        Muscle* curr = muscles_to_remove[i];
+        for(unsigned j = 0; j < muscles.size(); ++j) {
+            if(curr == muscles[j].get()) {
+                muscles.erase(muscles.begin() + j);
+                break;
+            }
+        }
+    }
 }
 
 void Creature::checkLoneNodes() {
     if(nodes.size() >= 3) {
         for(unsigned i = 0; i < nodes.size(); ++i) {
-            Node* n = nodes[i].get();
             unsigned connected_node_count = 0;
-            Node* connected_node = nullptr;
+            int connected_node = -1;
 
             // Find connected nodes
             for(unsigned j = 0; j < muscles.size(); ++j) {
                 Muscle* musc = muscles[j].get();
-                if(musc->a == n) {
+                if(musc->a == i) {
                     ++connected_node_count;
                     connected_node = musc->b;
                 }
-                else if(musc->b == n) {
+                else if(musc->b == i) {
                     ++connected_node_count;
                     connected_node = musc->b;
                 }
@@ -132,9 +137,9 @@ void Creature::checkLoneNodes() {
             if(connected_node_count < 1) {
                 unsigned buddy;
                 do { buddy = random_int(0, nodes.size() - 1);
-                } while(buddy == i || nodes[i].get() == connected_node); // It's me or someone who is already a friend
+                } while(buddy == i || i == connected_node); // It's me or someone who is already a friend
 
-                addMuscle(nodes[i].get(), nodes[buddy].get());
+                addMuscle(i, buddy);
             }
         }
     }
@@ -151,7 +156,7 @@ void Creature::addRandomNode() {
     new_node->init(world, nodes[parent]->getPosition() + offset,
                   random_float(0, 1)); // Friction
 
-    addMuscle(nodes[parent].get(), new_node);
+    addMuscle(parent, nodes.size()-1);
 
     // Connect one more muscle to the closest node
     unsigned closest_id = -1;
@@ -166,26 +171,26 @@ void Creature::addRandomNode() {
         }
     }
 
-    if(closest_id != -1) addMuscle(nodes[closest_id].get(), new_node);
+    if(closest_id != -1) addMuscle(closest_id, nodes.size()-1);
 }
 
-void Creature::addMuscle(Node* a, Node* b) {
+void Creature::addMuscle(int a, int b) {
     // Pick random two nodes
-    if(a == nullptr) {
+    if(a == -1) {
         if(nodes.size() < 3) return;
 
-        a = b = nodes[random_int(0, nodes.size() - 1)].get();
+        a = b = random_int(0, nodes.size() - 1);
 
         while(a == b) {
-            b = nodes[random_int(0, nodes.size() - 1)].get();
+            b = random_int(0, nodes.size() - 1);
         }
     }
 
     // Create the muscle
     float ratio = random_float(0.01, 0.2);
     muscles.push_back(std::make_unique<Muscle>());
-    float dist = magnitude(b->getPosition() - a->getPosition());
-    muscles.back()->init(world, a, b,
+    float dist = magnitude(nodes[b]->getPosition() - nodes[a]->getPosition());
+    muscles.back()->init(world, nodes, a, b,
                              dist*(1.0f - ratio), // Short length
                              dist*(1.0f + ratio), // Long length
                              random_float(0, 1), // Extend time
@@ -237,7 +242,7 @@ Muscle::~Muscle() {
     joint = nullptr;
 }
 
-void Muscle::init(b2World* world_, Node* a_, Node* b_,
+void Muscle::init(b2World* world_, std::vector<std::unique_ptr<Node>>& nodes, int a_, int b_,
                float short_len_, float long_len_,
                float extend_time_, float contract_time_,
                float strength_) {
@@ -246,10 +251,10 @@ void Muscle::init(b2World* world_, Node* a_, Node* b_,
 
 
     b2DistanceJointDef jointDef;
-    jointDef.bodyA = a->body;
-    jointDef.bodyB = b->body;
+    jointDef.bodyA = nodes[a]->body;
+    jointDef.bodyB = nodes[b]->body;
 
-    sf::Vector2f a2b = normalize(b->getPosition() - a->getPosition())*a->shape.m_radius;
+    sf::Vector2f a2b = normalize(nodes[b]->getPosition() - nodes[a]->getPosition())*nodes[a]->shape.m_radius;
     jointDef.localAnchorA = b2Vec2( a2b.x,  a2b.y);
     jointDef.localAnchorB = b2Vec2(-a2b.x, -a2b.y);
     jointDef.collideConnected = false;
@@ -272,22 +277,16 @@ void Muscle::init(b2World* world_, Node* a_, Node* b_,
     c = sf::Color(255 - (255-0)*d, 255 - (255-0)*d, 255 - (255-0)*d);
 }
 
-std::unique_ptr<Muscle> Muscle::copy() {
-    std::unique_ptr<Muscle> copied = std::make_unique<Muscle>();
-    copied->init(world, a, b, short_len, long_len, extend_time, contract_time, strength);
-    return std::move(copied);
-}
-
-std::unique_ptr<Muscle> Muscle::mutatedCopy() {
+std::unique_ptr<Muscle> Muscle::mutatedCopy(std::vector<std::unique_ptr<Node>>& nodes) {
     std::unique_ptr<Muscle> mutated = std::make_unique<Muscle>();
-    float len1 = short_len + short_len*random_float(-0.2, 0.2);
-    float len2 = long_len  + long_len *random_float(-0.2, 0.2);
-    mutated->init(world, a, b,
+    float len1 = short_len + short_len*0.2f*r();
+    float len2 = long_len  + long_len *0.2f*r();
+    mutated->init(world, nodes, a, b,
                      std::min(len1, len2), // Short length
                      std::max(len1, len2), // Long length
-                     std::min(std::max(extend_time   + random_float(-0.2, 0.2), 0.0f), 1.0f), // Extend time
-                     std::min(std::max(contract_time + random_float(-0.2, 0.2), 0.0f), 1.0f), // Contract time
-                     strength + strength*random_float(-0.2, 0.2)); // Strength
+                     std::min(std::max(extend_time   + 0.2f*r(), 0.0f), 1.0f), // Extend time
+                     std::min(std::max(contract_time + 0.2f*r(), 0.0f), 1.0f), // Contract time
+                     strength + strength*0.2*r()); // Strength
     return std::move(mutated);
 }
 
@@ -337,16 +336,10 @@ Node::~Node() {
 
 std::unique_ptr<Node> Node::mutatedCopy() {
     std::unique_ptr<Node> mutated = std::make_unique<Node>();
-    mutated->init(world, sf::Vector2f(getPosition().x + 0.33f*random_float(NODE_DIST, NODE_DIST),
-                                      getPosition().y + 0.33f*random_float(NODE_DIST, NODE_DIST)),
-                 std::min(std::max(fixture_def.friction + random_float(-0.1, 0.1), 0.0f), 1.0f));
+    mutated->init(world, sf::Vector2f(getPosition().x + 0.33f*NODE_DIST*r(),
+                                      getPosition().y + 0.33f*NODE_DIST*r()),
+                 std::min(std::max(fixture_def.friction + 0.1f*r(), 0.0f), 1.0f));
     return std::move(mutated);
-}
-
-std::unique_ptr<Node> Node::copy() {
-    std::unique_ptr<Node> copied = std::make_unique<Node>();
-    copied->init(world, getPosition(), fixture_def.friction);
-    return std::move(copied);
 }
 
 void Node::init(b2World* world_, const sf::Vector2f& pos, float friction) {

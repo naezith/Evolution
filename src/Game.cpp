@@ -3,7 +3,7 @@
 #include <iostream>
 
 Game Game::m_instance;
-const unsigned POPULATION = 2;
+const unsigned POPULATION = 12;
 void Game::init(float _dt) {
     setDeltaTime(_dt);
     m_view_size = sf::Vector2f(1280, 720);
@@ -92,12 +92,12 @@ void Game::spawnCreature() {
 
 int randomSelection(std::vector<std::unique_ptr<Creature>>& p) {
     float sum_fitness = 0;
-    for(unsigned i = 0; i < p.size(); ++i) sum_fitness += p[i]->fitness;
+    for(unsigned i = 0; i < p.size(); ++i) sum_fitness += p[i]->fitness*p[i]->fitness*p[i]->fitness;
 
     float val = std::rand() % std::max(1, (int)sum_fitness);
     for(unsigned i = 0; i < p.size(); ++i) {
-        val -= p[i]->fitness;
-        if(val <= 0) i;
+        val -= p[i]->fitness*p[i]->fitness*p[i]->fitness;
+        if(val <= 0) return i;
     }
 
     return p.size() - 1;
@@ -136,6 +136,7 @@ void Game::update() {
             std::vector<std::unique_ptr<Creature>> new_creatures;
 
             for(int i = 0; i < m_creatures.size(); ++i) {
+                std::cout << "C# "<< i << "  ->  " <<  m_creatures[i]->fitness << std::endl;
                 int chosen = randomSelection(m_creatures);
                 new_creatures.push_back(m_creatures[chosen]->mutatedCopy());
                 new_creatures.back()->setPosition(spawn_pos);
@@ -147,7 +148,6 @@ void Game::update() {
             // Make the new population, current population
             for(unsigned i = 0; i < m_creatures.size(); ++i){
                 m_creatures[i] = std::move(new_creatures[i]);
-                std::cout << "C# "<< i << "  ->  " <<  m_creatures[i]->fitness << std::endl;
             }
 
             // Reset stats
@@ -180,7 +180,7 @@ void Game::render() {
 
     sf::RectangleShape line(sf::Vector2f(0.025, 4.0));
     line.setOrigin(line.getSize().x*0.5f, line.getSize().y);
-    for(int i = -30; i <= 30; ++i) {
+    for(int i = 0; i <= 60; ++i) {
         line.setPosition(i, groundBody->GetPosition().y);
         m_window.draw(line);
 
