@@ -14,6 +14,8 @@ void Creature::init(b2World* world, const sf::Vector2f& pos) {
 
     int node_count = random_int(2, 3);
     for(int i = 0; i < node_count; ++i) addRandomNode();
+
+    setActive(false);
 }
 
 void Creature::addRandomNode() {
@@ -51,6 +53,7 @@ void Creature::addMuscle(Node* a, Node* b) {
     b2DistanceJointDef jointDef;
     jointDef.bodyA = a->body;
     jointDef.bodyB = b->body;
+    if(jointDef.bodyA == nullptr || jointDef.bodyB == nullptr) return;
 
     sf::Vector2f dist_vec = b->getPosition() - a->getPosition();
     float dist = magnitude(dist_vec);
@@ -87,6 +90,11 @@ void Creature::update(float dt) {
     if(pos.x > fitness) fitness = pos.x;
 }
 
+void Creature::setActive(bool active) {
+    for(unsigned i = 0; i < nodes.size(); ++i) nodes[i].setActive(active);
+    for(unsigned i = 0; i < muscles.size(); ++i) muscles[i].setActive(active);
+}
+
 void Creature::render(sf::RenderTarget& rt) {
     for(unsigned i = 0; i < muscles.size(); ++i) muscles[i].render(rt);
 
@@ -116,14 +124,21 @@ Muscle::Muscle(b2World* world, b2DistanceJointDef& def,
 }
 
 void Muscle::update(float c_time, float dt) {
+    if(joint == nullptr) return;
+
     target_len = (contract_time < extend_time && (c_time < contract_time || extend_time < c_time)) ||
                  (extend_time < contract_time && extend_time < c_time) ?
                 &short_len : &long_len;
 
     joint->SetLength(joint->GetLength() + strength*((*target_len) - joint->GetLength())*dt);
 }
+void Muscle::setActive(bool active) {
+
+}
 
 void Muscle::render(sf::RenderTarget& rt) {
+    if(joint == nullptr) return;
+
     sf::RectangleShape rect;
 
     sf::Vector2f a(joint->GetBodyA()->GetPosition().x, joint->GetBodyA()->GetPosition().y);
@@ -155,6 +170,7 @@ void Node::init(b2World* world, const sf::Vector2f& pos, float friction) {
     body_def.position.Set(-10, 20); //a little to the left
     body_def.fixedRotation = true;
     body = world->CreateBody(&body_def);
+    if(body == nullptr) return;
 
     shape.m_p.Set(0, 0); //position, relative to body position
     shape.m_radius = MUSCLE_THICKNESS*0.8; //radius
@@ -171,15 +187,23 @@ void Node::init(b2World* world, const sf::Vector2f& pos, float friction) {
     c = sf::Color(255 - (255-139)*d, 255 - (255-0)*d, 255 - (255-0)*d);
 }
 
+void Node::setActive(bool active) {
+    if(body == nullptr) return;
+    body->SetActive(active);
+}
+
 sf::Vector2f Node::getPosition() const {
+    if(body == nullptr) return sf::Vector2f(0, 0);
     return sf::Vector2f(body->GetPosition().x, body->GetPosition().y);
 }
 
 void Node::setPosition(const sf::Vector2f& pos) {
+    if(body == nullptr) return;
     body->SetTransform(b2Vec2(pos.x, pos.y), body->GetAngle());
 }
 
 void Node::render(sf::RenderTarget& rt) {
+    if(body == nullptr) return;
     sf::CircleShape circ;
     circ.setFillColor(c);
     circ.setRadius(shape.m_radius);

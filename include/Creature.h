@@ -10,6 +10,7 @@ class Muscle {
                float extend_time_, float contract_time_, float strength_);
 
         void update(float c_time, float dt);
+        void setActive(bool active);
         void render(sf::RenderTarget& rt);
 
         b2DistanceJoint* joint = nullptr;
@@ -31,6 +32,7 @@ class Node{
         virtual ~Node();
 
         void init(b2World* world, const sf::Vector2f& pos, float friction);
+        void setActive(bool active);
         sf::Vector2f getPosition() const;
         void setPosition(const sf::Vector2f& pos);
         void render(sf::RenderTarget& rt);
@@ -52,6 +54,7 @@ class Creature {
 
         void addRandomNode();
         void addMuscle(Node* a, Node* b);
+        void setActive(bool active);
 
         std::vector<Node> nodes;
         std::vector<Muscle> muscles;

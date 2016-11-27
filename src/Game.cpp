@@ -3,7 +3,7 @@
 #include <iostream>
 
 Game Game::m_instance;
-
+const unsigned POPULATION = 1000;
 void Game::init(float _dt) {
     setDeltaTime(_dt);
     m_view_size = sf::Vector2f(1280, 720);
@@ -33,7 +33,8 @@ void Game::init(float _dt) {
     groundFixture = groundBody->CreateFixture(&groundBox, 0.0f);
     groundFixture->SetFriction(1.0);
 
-    spawnCreature();
+    for(int i = 0; i < POPULATION; ++i) spawnCreature();
+    m_creatures[curr_creature_id = 0].setActive(true);
 }
 
 void Game::drawRect(sf::VertexArray& va, b2Body* b, b2Fixture* f, const sf::Vector2f& dim, const sf::Color& c) {
@@ -90,8 +91,6 @@ void Game::spawnCreature() {
     //if(m_creatures.size() > 0) return;
     m_creatures.emplace_back();
     m_creatures.back().init(m_world.get(), sf::Vector2f(0, m_view_size.y - viewDimensions.y*0.3));
-    curr_creature_id = m_creatures.size()-1;
-    m_global_timer = 0.0f;
 }
 
 void Game::update() {
@@ -101,12 +100,6 @@ void Game::update() {
 
     m_world->Step(m_dt, 6, 2);
 
-    // Put camera on best creature
-    /*best_x = 0.0f;
-    for(unsigned i = 0; i < m_creatures.size(); ++i) {
-        float dist = m_creatures[i].getPosition().x;
-        if(dist > best_x) best_x = dist;
-    }*/
     best_x = m_creatures[curr_creature_id].fitness;
     if(best_x > overall_best_x) {
         overall_best_id = curr_creature_id;
@@ -116,8 +109,23 @@ void Game::update() {
     m_window.setView(view);
 
     // Create new creature after a while
-    if(m_global_timer > 20.0f) {
-        spawnCreature();
+    if(m_global_timer >= 15.0f) {
+        m_creatures[curr_creature_id].setActive(false);
+
+        m_global_timer = 0.0f;
+
+        // All creatures did the test,
+        if(curr_creature_id >= POPULATION) {
+            // Create a new generation
+
+            // Reset stats
+            curr_creature_id = overall_best_x = overall_best_id = 0;
+            gen = 1;
+        }
+        // Continue testing creatures
+        else ++curr_creature_id;
+
+        m_creatures[curr_creature_id].setActive(true);
     }
 }
 
