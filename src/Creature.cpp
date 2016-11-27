@@ -50,7 +50,7 @@ std::unique_ptr<Creature> Creature::mutatedCopy() {
     if(random_int(0, 100) < 5) mutated->addMuscle();
 
     // Remove random node
-    //if(random_int(0, 100) < 5) mutated->removeRandomNode();
+    if(random_int(0, 100) < 5) mutated->removeRandomNode();
 
     // Remove random muscle
     if(random_int(0, 100) < 5) mutated->removeRandomMuscle();
@@ -66,7 +66,7 @@ std::unique_ptr<Creature> Creature::mutatedCopy() {
 const float NODE_DIST = 1.5f;
 void Creature::removeRandomNode() {
     if(nodes.size() > 3) {
-        int victim_id = random_int(0, muscles.size() - 1);
+        int victim_id = random_int(0, nodes.size() - 1);
 
         // Remove the muscles which hold this node
         int i = 0;
@@ -76,10 +76,12 @@ void Creature::removeRandomNode() {
             else ++i;
         }
 
+        // Lower other
         for(int i = 0; i < muscles.size(); i++){
             Muscle* m = muscles[i].get();
-            if(m->a >= victim_id) m->a--;
-            if(m->b >= victim_id) m->b--;
+
+            if(m->a >= victim_id) --m->a;
+            if(m->b >= victim_id) --m->b;
         }
 
         nodes.erase(nodes.begin() + victim_id);
@@ -279,8 +281,8 @@ void Muscle::init(b2World* world_, std::vector<std::unique_ptr<Node>>& nodes, in
 
 std::unique_ptr<Muscle> Muscle::mutatedCopy(std::vector<std::unique_ptr<Node>>& nodes) {
     std::unique_ptr<Muscle> mutated = std::make_unique<Muscle>();
-    float len1 = short_len + short_len*0.2f*r();
-    float len2 = long_len  + long_len *0.2f*r();
+    float len1 = short_len + short_len*0.15f*r();
+    float len2 = long_len  + long_len *0.15f*r();
     mutated->init(world, nodes, a, b,
                      std::min(len1, len2), // Short length
                      std::max(len1, len2), // Long length
@@ -336,8 +338,8 @@ Node::~Node() {
 
 std::unique_ptr<Node> Node::mutatedCopy() {
     std::unique_ptr<Node> mutated = std::make_unique<Node>();
-    mutated->init(world, sf::Vector2f(getPosition().x + 0.33f*NODE_DIST*r(),
-                                      getPosition().y + 0.33f*NODE_DIST*r()),
+    mutated->init(world, sf::Vector2f(getPosition().x + 0.333f*NODE_DIST*r(),
+                                      getPosition().y + 0.333f*NODE_DIST*r()),
                  std::min(std::max(fixture_def.friction + 0.1f*r(), 0.0f), 1.0f));
     return std::move(mutated);
 }

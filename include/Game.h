@@ -53,6 +53,9 @@ class Game {
         // Genetic Algorithm
         unsigned gen = 1;
         unsigned curr_creature_id = 0;
+
+        bool j_last_frame = false;
+        bool simulate_quick = false;
 };
 
 #endif // GAME_H

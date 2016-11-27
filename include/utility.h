@@ -10,7 +10,7 @@ constexpr float RADTODEGREE = 57.295779513082320876798154814105;
 constexpr float SIN45 = 0.70710678118; //Sinus of 45 degrees, also length of unit vector.x or .y
 constexpr float PI = 3.14159265359;
 
-static std::mt19937 mt(1337);
+static std::mt19937 mt(1338);
 static int random_int(int lower, int higher) {
     std::uniform_int_distribution<int> dist(lower, higher);
     return dist(mt);

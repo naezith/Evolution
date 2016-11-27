@@ -3,7 +3,7 @@
 #include <iostream>
 
 Game Game::m_instance;
-const unsigned POPULATION = 12;
+const unsigned POPULATION = 20;
 void Game::init(float _dt) {
     setDeltaTime(_dt);
     m_view_size = sf::Vector2f(1280, 720);
@@ -60,7 +60,13 @@ void Game::run() {
 
     while(m_window.isOpen()){
         double elapsed = clock.restart().asSeconds();
-        if(sf::Keyboard::isKeyPressed(sf::Keyboard::H)) update(); // Just simulate as fast as possible
+
+        // Toggle fast simulation
+        bool j_now = sf::Keyboard::isKeyPressed(sf::Keyboard::J);
+        if(j_now && !j_last_frame) simulate_quick = !simulate_quick;
+        j_last_frame = j_now;
+
+        if(simulate_quick) update(); // Just simulate as fast as possible
         else {
             // Update
             if(sf::Keyboard::isKeyPressed(sf::Keyboard::K)) elapsed *= 4.0; // Simulate 4x
@@ -84,19 +90,23 @@ void Game::run() {
         }
     }
 }
-sf::Vector2f Game::getSpawnPos() { return sf::Vector2f(0, m_view_size.y - viewDimensions.y*0.3); }
+sf::Vector2f Game::getSpawnPos() { return sf::Vector2f(0, m_view_size.y - viewDimensions.y*0.2); }
 void Game::spawnCreature() {
     m_creatures.push_back(std::make_unique<Creature>());
     m_creatures.back()->init(m_world.get(), getSpawnPos());
 }
 
+static inline float getFitness(float k) {
+    return k*k*k;
+}
+
 int randomSelection(std::vector<std::unique_ptr<Creature>>& p) {
     float sum_fitness = 0;
-    for(unsigned i = 0; i < p.size(); ++i) sum_fitness += p[i]->fitness*p[i]->fitness*p[i]->fitness;
+    for(unsigned i = 0; i < p.size(); ++i) sum_fitness += getFitness(p[i]->fitness);
 
     float val = std::rand() % std::max(1, (int)sum_fitness);
     for(unsigned i = 0; i < p.size(); ++i) {
-        val -= p[i]->fitness*p[i]->fitness*p[i]->fitness;
+        val -= getFitness(p[i]->fitness);
         if(val <= 0) return i;
     }
 
@@ -107,22 +117,13 @@ void Game::update() {
     m_global_timer += m_dt;
 
     m_creatures[curr_creature_id]->update(m_dt);
-
-    m_world->Step(m_dt, 6, 2);
-
-    best_x = m_creatures[curr_creature_id]->fitness;
-    if(best_x > overall_best_x) {
-        overall_best_id = curr_creature_id;
-        overall_best_x = best_x;
-    }
-    view.reset(sf::FloatRect(best_x - viewDimensions.x*0.5f, m_view_size.y - viewDimensions.y, viewDimensions.x, viewDimensions.y));
-    m_window.setView(view);
+    m_world->Step(m_dt, 1, 1);
 
     // Create new creature after a while
     if(m_global_timer >= 15.0f) {
-        m_creatures[curr_creature_id]->setActive(false);
-
         m_global_timer = 0.0f;
+
+        m_creatures[curr_creature_id]->setActive(false);
 
         // All creatures did the test,
         if(curr_creature_id >= POPULATION-1) {
@@ -130,30 +131,30 @@ void Game::update() {
             std::sort(m_creatures.begin(), m_creatures.end(), [](const std::unique_ptr<Creature>& c1,
                                                                  const std::unique_ptr<Creature>& c2)
                                                                 { return c1->fitness > c2->fitness; });
-            std::cout << ">> New Gen #" << gen << std::endl;
-            sf::Vector2f spawn_pos = getSpawnPos();
+            std::cout << "> G#" << gen << std::endl;
 
             std::vector<std::unique_ptr<Creature>> new_creatures;
 
+            int print_count = std::min(2, (int)m_creatures.size());
+            for(int i = 0; i < print_count; ++i) {
+                std::cout << m_creatures[i]->fitness << std::endl;
+            }
+
+            sf::Vector2f spawn_pos = getSpawnPos();
             for(int i = 0; i < m_creatures.size(); ++i) {
-                std::cout << "C# "<< i << "  ->  " <<  m_creatures[i]->fitness << std::endl;
                 int chosen = randomSelection(m_creatures);
                 new_creatures.push_back(m_creatures[chosen]->mutatedCopy());
                 new_creatures.back()->setPosition(spawn_pos);
             }
 
-            std::sort(new_creatures.begin(), new_creatures.end(), [](const std::unique_ptr<Creature>& c1,
-                                                                     const std::unique_ptr<Creature>& c2)
-                                                                    { return c1->fitness > c2->fitness; });
             // Make the new population, current population
-            for(unsigned i = 0; i < m_creatures.size(); ++i){
+            for(unsigned i = 0; i < m_creatures.size(); ++i)
                 m_creatures[i] = std::move(new_creatures[i]);
-            }
+
 
             // Reset stats
-            curr_creature_id = overall_best_x = overall_best_id = 0;
+            curr_creature_id = overall_best_id = 0;
             ++gen;
-            std::cout << "Created new generation creatures." << std::endl;
         }
         // Continue testing creatures
         else ++curr_creature_id;
@@ -164,7 +165,15 @@ void Game::update() {
 
 void Game::render() {
     m_window.clear(sf::Color(135, 206, 250));
+
+    best_x = m_creatures[curr_creature_id]->fitness;
+    if(best_x > overall_best_x) {
+        overall_best_id = curr_creature_id;
+        overall_best_x = best_x;
+    }
+    view.reset(sf::FloatRect(best_x - viewDimensions.x*0.5f, m_view_size.y - viewDimensions.y, viewDimensions.x, viewDimensions.y));
     m_window.setView(view);
+
     sf::VertexArray va(sf::Quads);
 
     // Draw background lines
@@ -180,7 +189,7 @@ void Game::render() {
 
     sf::RectangleShape line(sf::Vector2f(0.025, 4.0));
     line.setOrigin(line.getSize().x*0.5f, line.getSize().y);
-    for(int i = 0; i <= 60; ++i) {
+    for(int i = 0; i <= 300; ++i) {
         line.setPosition(i, groundBody->GetPosition().y);
         m_window.draw(line);
 
