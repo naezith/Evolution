@@ -22,6 +22,9 @@ void Creature::init(b2World* world_, const sf::Vector2f& position) {
 
     setPosition(position);
     setActive(false);
+
+    // Save the first version
+    saveSnapshot(snapshot);
 }
 
 void Creature::setPosition(const sf::Vector2f& position) {
@@ -35,19 +38,26 @@ void Creature::setPosition(const sf::Vector2f& position) {
     pos = position; // Center is changed
 }
 
-std::unique_ptr<Creature> Creature::copy() {
-    std::unique_ptr<Creature> copied = std::make_unique<Creature>();
+void Creature::saveSnapshot(std::unique_ptr<Creature>& out) {
+    out = std::make_unique<Creature>();
 
-    copied->world = world;
-    copied->heart_beat = heart_beat;
+    out->world = world;
+    out->heart_beat = heart_beat;
+    out->fitness = fitness;
+    out->timer = timer;
 
     for(unsigned i = 0; i < nodes.size(); ++i)
-        copied->nodes.push_back(nodes[i]->copy());
+        out->nodes.push_back(nodes[i]->copy());
 
     for(unsigned i = 0; i < muscles.size(); ++i)
-        copied->muscles.push_back(muscles[i]->copy(copied->nodes));
+        out->muscles.push_back(muscles[i]->copy(out->nodes));
 
-    copied->setActive(false);
+    out->setActive(false);
+}
+
+std::unique_ptr<Creature> Creature::copy() {
+    std::unique_ptr<Creature> copied;
+    snapshot->saveSnapshot(copied);
     return std::move(copied);
 }
 
@@ -75,7 +85,7 @@ std::unique_ptr<Creature> Creature::mutatedCopy() {
     mutated->checkMuscleOverlap();
     mutated->checkLoneNodes();
     mutated->setActive(false);
-
+    mutated->saveSnapshot(mutated->snapshot);
     return std::move(mutated);
 }
 
@@ -222,7 +232,7 @@ void Creature::updatePosition() {
     pos = sum / (float) nodes.size();
 }
 
-void Creature::update(float dt) {
+void Creature::update(float dt, bool update_fitness) {
     if((timer += dt) > heart_beat) timer = 0;
     for(unsigned i = 0; i < muscles.size(); ++i) {
         muscles[i]->update(timer/heart_beat, dt);
@@ -232,7 +242,7 @@ void Creature::update(float dt) {
     updatePosition();
 
     // His distance is his fitness
-    if(pos.x > fitness) fitness = pos.x;
+    if(update_fitness && pos.x > fitness) fitness = pos.x;
 }
 
 void Creature::setActive(bool active) {

@@ -62,9 +62,11 @@ class Creature {
         void init(b2World* world_, const sf::Vector2f& position);
         void updatePosition();
         void setPosition(const sf::Vector2f& position);
-        void update(float dt);
+        void update(float dt, bool update_fitness = true);
         void render(sf::RenderTarget& rt);
         const sf::Vector2f& getPosition() const { return pos; };
+
+        void saveSnapshot(std::unique_ptr<Creature>& out);
 
         void addRandomNode();
         void addMuscle(int a = -1, int b = -1);
@@ -81,9 +83,10 @@ class Creature {
 
         float timer = 0.0f;
         float heart_beat = 0.5f;
+        float fitness = 0.0f;
 
         b2World* world = nullptr;
-        float fitness = 0.0f;
+        std::unique_ptr<Creature> snapshot;
     private:
         sf::Vector2f pos;
 };

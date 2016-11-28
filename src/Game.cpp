@@ -33,6 +33,8 @@ void Game::init(float _dt) {
 
     for(int i = 0; i < POPULATION; ++i) spawnCreature();
     m_creatures[curr_creature_id = 0]->setActive(true);
+    best_creature = m_creatures[0]->copy();
+    best_creature->setActive(true);
 }
 
 void Game::drawRect(sf::VertexArray& va, b2Body* b, b2Fixture* f, const sf::Vector2f& dim, const sf::Color& c) {
@@ -121,7 +123,7 @@ int randomSelection(std::vector<std::unique_ptr<Creature>>& p) {
 void Game::update() {
     m_global_timer += m_dt;
 
-    if(best_creature != nullptr) best_creature->update(m_dt);
+    best_creature->update(m_dt, false);
     m_creatures[curr_creature_id]->update(m_dt);
     m_world->Step(m_dt, 1, 1);
 
@@ -133,7 +135,7 @@ void Game::update() {
 
         sf::Vector2f spawn_pos = getSpawnPos();
         // Set the best creature if it's better
-        if(best_creature == nullptr || best_creature->fitness < m_creatures[curr_creature_id]->fitness){
+        if(best_creature->fitness < m_creatures[curr_creature_id]->fitness){
             best_c_gen = gen;
             best_c_id = curr_creature_id;
             best_creature = m_creatures[curr_creature_id]->copy();
@@ -147,13 +149,13 @@ void Game::update() {
             std::sort(m_creatures.begin(), m_creatures.end(), [](const std::unique_ptr<Creature>& c1,
                                                                  const std::unique_ptr<Creature>& c2)
                                                                 { return c1->fitness > c2->fitness; });
-            std::cout << "> G#" << gen << std::endl;
+            std::cout << "> G#" << gen << "\n";
 
             std::vector<std::unique_ptr<Creature>> new_creatures;
 
             int print_count = std::min(2, (int)m_creatures.size());
             for(int i = 0; i < print_count; ++i) {
-                std::cout << m_creatures[i]->fitness << std::endl;
+                std::cout << m_creatures[i]->fitness << "\n";
             }
 
             for(int i = 0; i < m_creatures.size(); ++i) {
@@ -182,7 +184,7 @@ void Game::render() {
     m_window.clear(sf::Color(135, 206, 250));
 
     float curr_x = m_creatures[curr_creature_id]->fitness;
-    float focus_x = show_best && best_creature != nullptr ? best_creature->getPosition().x : curr_x;
+    float focus_x = show_best ? best_creature->getPosition().x : curr_x;
     best_x = focus_x;
 
 
@@ -240,11 +242,9 @@ void Game::render() {
     // Show the overall best
     text.setString("Current Gen #" + std::to_string(gen) +
                    "  ID #" + std::to_string(curr_creature_id + 1) +
-                   (best_creature != nullptr ?
-                    ("                   Best Creature:  Gen #" + std::to_string(best_c_gen) +
-                                                "  ID #" + std::to_string(best_c_id)  +
-                                                "    Dist: " +  setPrecision(best_creature->fitness, 2) + " m")
-                    : ""));
+                   "                   Best Creature:  Gen #" + std::to_string(best_c_gen) +
+                                                "  ID #" + std::to_string(best_c_id + 1)  +
+                                                "    Dist: " +  setPrecision(best_creature->fitness, 2) + " m       " + std::to_string((unsigned long long)best_creature.get()));
     text.setOrigin(text.getGlobalBounds().width*0.5f, text.getGlobalBounds().height*0.5f);
     text.setPosition(best_x - text.getCharacterSize()*0.01f - 1, text.getPosition().y - 1);
     text_back.setPosition(best_x - 1, text.getGlobalBounds().top + text.getGlobalBounds().height*0.5f);
@@ -255,7 +255,7 @@ void Game::render() {
 
 
     // Draw Creatures
-    if(best_creature != nullptr) best_creature->render(m_window);
+    best_creature->render(m_window);
     m_creatures[curr_creature_id]->render(m_window);
 
 
