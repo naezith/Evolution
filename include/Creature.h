@@ -67,6 +67,7 @@ class Creature {
         const sf::Vector2f& getPosition() const { return pos; };
 
         void saveSnapshot(std::unique_ptr<Creature>& out);
+        void reset(std::unique_ptr<Creature>& ref_to_me);
 
         void addRandomNode();
         void addMuscle(int a = -1, int b = -1);

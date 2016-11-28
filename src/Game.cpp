@@ -100,7 +100,8 @@ void Game::run() {
 sf::Vector2f Game::getSpawnPos() { return sf::Vector2f(0, m_view_size.y - viewDimensions.y*0.2); }
 void Game::spawnCreature() {
     m_creatures.push_back(std::make_unique<Creature>());
-    m_creatures.back()->init(m_world.get(), getSpawnPos());
+    m_creatures.back()->init(m_world.get(), sf::Vector2f(0, 0));
+    m_creatures.back()->setPosition(getSpawnPos());
 }
 
 static inline float getFitness(float k) {
@@ -139,8 +140,11 @@ void Game::update() {
             best_c_gen = gen;
             best_c_id = curr_creature_id;
             best_creature = m_creatures[curr_creature_id]->copy();
-            best_creature->setActive(true);
         }
+        else { // Reset
+            best_creature = best_creature->copy();
+        }
+        best_creature->setActive(true);
         best_creature->setPosition(spawn_pos);
 
         // All creatures did the test,
@@ -244,7 +248,7 @@ void Game::render() {
                    "  ID #" + std::to_string(curr_creature_id + 1) +
                    "                   Best Creature:  Gen #" + std::to_string(best_c_gen) +
                                                 "  ID #" + std::to_string(best_c_id + 1)  +
-                                                "    Dist: " +  setPrecision(best_creature->fitness, 2) + " m       " + std::to_string((unsigned long long)best_creature.get()));
+                                                "    Dist: " +  setPrecision(best_creature->fitness, 2) + " m");
     text.setOrigin(text.getGlobalBounds().width*0.5f, text.getGlobalBounds().height*0.5f);
     text.setPosition(best_x - text.getCharacterSize()*0.01f - 1, text.getPosition().y - 1);
     text_back.setPosition(best_x - 1, text.getGlobalBounds().top + text.getGlobalBounds().height*0.5f);
