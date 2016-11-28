@@ -66,6 +66,11 @@ void Game::run() {
         if(j_now && !j_last_frame) simulate_quick = !simulate_quick;
         j_last_frame = j_now;
 
+        // Focus camera on the best one
+        bool cam_key_now = sf::Keyboard::isKeyPressed(sf::Keyboard::H);
+        if(cam_key_now && !cam_key_last_frame) show_best = !show_best;
+        cam_key_last_frame = cam_key_now;
+
         if(simulate_quick) update(); // Just simulate as fast as possible
         else {
             // Update
@@ -116,6 +121,7 @@ int randomSelection(std::vector<std::unique_ptr<Creature>>& p) {
 void Game::update() {
     m_global_timer += m_dt;
 
+    if(best_creature != nullptr) best_creature->update(m_dt);
     m_creatures[curr_creature_id]->update(m_dt);
     m_world->Step(m_dt, 1, 1);
 
@@ -124,6 +130,16 @@ void Game::update() {
         m_global_timer = 0.0f;
 
         m_creatures[curr_creature_id]->setActive(false);
+
+        sf::Vector2f spawn_pos = getSpawnPos();
+        // Set the best creature if it's better
+        if(best_creature == nullptr || best_creature->fitness < m_creatures[curr_creature_id]->fitness){
+            best_c_gen = gen;
+            best_c_id = curr_creature_id;
+            best_creature = m_creatures[curr_creature_id]->copy();
+            best_creature->setActive(true);
+        }
+        best_creature->setPosition(spawn_pos);
 
         // All creatures did the test,
         if(curr_creature_id >= POPULATION-1) {
@@ -140,7 +156,6 @@ void Game::update() {
                 std::cout << m_creatures[i]->fitness << std::endl;
             }
 
-            sf::Vector2f spawn_pos = getSpawnPos();
             for(int i = 0; i < m_creatures.size(); ++i) {
                 int chosen = randomSelection(m_creatures);
                 new_creatures.push_back(m_creatures[chosen]->mutatedCopy());
@@ -153,12 +168,12 @@ void Game::update() {
 
 
             // Reset stats
-            curr_creature_id = overall_best_id = 0;
+            curr_creature_id = 0;
+
             ++gen;
         }
         // Continue testing creatures
         else ++curr_creature_id;
-
         m_creatures[curr_creature_id]->setActive(true);
     }
 }
@@ -166,12 +181,12 @@ void Game::update() {
 void Game::render() {
     m_window.clear(sf::Color(135, 206, 250));
 
-    best_x = m_creatures[curr_creature_id]->fitness;
-    if(best_x > overall_best_x) {
-        overall_best_id = curr_creature_id;
-        overall_best_x = best_x;
-    }
-    view.reset(sf::FloatRect(best_x - viewDimensions.x*0.5f, m_view_size.y - viewDimensions.y, viewDimensions.x, viewDimensions.y));
+    float curr_x = m_creatures[curr_creature_id]->fitness;
+    float focus_x = show_best && best_creature != nullptr ? best_creature->getPosition().x : curr_x;
+    best_x = focus_x;
+
+
+    view.reset(sf::FloatRect(focus_x - viewDimensions.x*0.5f, m_view_size.y - viewDimensions.y, viewDimensions.x, viewDimensions.y));
     m_window.setView(view);
 
     sf::VertexArray va(sf::Quads);
@@ -223,20 +238,24 @@ void Game::render() {
     m_window.draw(text);
 
     // Show the overall best
-    text.setString("Gen #" + std::to_string(gen) +
-                   "           Current Creature: #" + std::to_string(curr_creature_id + 1) +
-                   "           Best creature: #" + std::to_string(overall_best_id + 1) +
-                   "       " + setPrecision(overall_best_x, 2) + " m");
+    text.setString("Current Gen #" + std::to_string(gen) +
+                   "  ID #" + std::to_string(curr_creature_id + 1) +
+                   (best_creature != nullptr ?
+                    ("                   Best Creature:  Gen #" + std::to_string(best_c_gen) +
+                                                "  ID #" + std::to_string(best_c_id)  +
+                                                "    Dist: " +  setPrecision(best_creature->fitness, 2) + " m")
+                    : ""));
     text.setOrigin(text.getGlobalBounds().width*0.5f, text.getGlobalBounds().height*0.5f);
     text.setPosition(best_x - text.getCharacterSize()*0.01f - 1, text.getPosition().y - 1);
     text_back.setPosition(best_x - 1, text.getGlobalBounds().top + text.getGlobalBounds().height*0.5f);
-    text_back.setSize(sf::Vector2f(text_back.getSize().x*4.0, text_back.getSize().y));
+    text_back.setSize(sf::Vector2f(text_back.getSize().x*6.0, text_back.getSize().y));
     text_back.setOrigin(0.2, text_back.getSize().y*0.5f);
     m_window.draw(text_back);
     m_window.draw(text);
 
 
     // Draw Creatures
+    if(best_creature != nullptr) best_creature->render(m_window);
     m_creatures[curr_creature_id]->render(m_window);
 
 

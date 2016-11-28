@@ -48,8 +48,6 @@ class Game {
         sf::Vector2f viewDimensions;
 
         float best_x = 0.0f;
-        unsigned overall_best_id = 0;
-        float overall_best_x = 0.0f;
         // Genetic Algorithm
         unsigned gen = 1;
         unsigned curr_creature_id = 0;
@@ -57,9 +55,12 @@ class Game {
         bool j_last_frame = false;
         bool simulate_quick = false;
 
-        bool n_last_frame = false;
+        bool cam_key_last_frame = false;
         bool show_best = false;
-        std::unique_ptr<Creature> best_creature;
+
+        std::unique_ptr<Creature> best_creature = nullptr;
+        int best_c_gen = 0;
+        int best_c_id = 0;
 };
 
 #endif // GAME_H
