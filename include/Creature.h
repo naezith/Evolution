@@ -17,6 +17,7 @@ class Muscle {
         void setActive(bool active);
         void render(sf::RenderTarget& rt);
         std::unique_ptr<Muscle> mutatedCopy(std::vector<std::unique_ptr<Node>>& node);
+        std::unique_ptr<Muscle> copy(std::vector<std::unique_ptr<Node>>& node);
 
         b2DistanceJoint* joint = nullptr;
 
@@ -44,6 +45,7 @@ class Node{
         void setPosition(const sf::Vector2f& pos);
         void render(sf::RenderTarget& rt);
         std::unique_ptr<Node> mutatedCopy();
+        std::unique_ptr<Node> copy();
 
         sf::Color c;
         b2CircleShape shape;
@@ -68,6 +70,7 @@ class Creature {
         void addMuscle(int a = -1, int b = -1);
         void setActive(bool active);
         std::unique_ptr<Creature> mutatedCopy();
+        std::unique_ptr<Creature> copy();
         void removeRandomNode();
         void removeRandomMuscle();
         void checkMuscleOverlap();

@@ -35,6 +35,22 @@ void Creature::setPosition(const sf::Vector2f& position) {
     pos = position; // Center is changed
 }
 
+std::unique_ptr<Creature> Creature::copy() {
+    std::unique_ptr<Creature> copied = std::make_unique<Creature>();
+
+    copied->world = world;
+    copied->heart_beat = heart_beat;
+
+    for(unsigned i = 0; i < nodes.size(); ++i)
+        copied->nodes.push_back(nodes[i]->copy());
+
+    for(unsigned i = 0; i < muscles.size(); ++i)
+        copied->muscles.push_back(muscles[i]->copy(copied->nodes));
+
+    copied->setActive(false);
+    return std::move(copied);
+}
+
 std::unique_ptr<Creature> Creature::mutatedCopy() {
     std::unique_ptr<Creature> mutated = std::make_unique<Creature>();
     mutated->world = world;
@@ -279,6 +295,12 @@ void Muscle::init(b2World* world_, std::vector<std::unique_ptr<Node>>& nodes, in
     c = sf::Color(255 - (255-0)*d, 255 - (255-0)*d, 255 - (255-0)*d);
 }
 
+std::unique_ptr<Muscle> Muscle::copy(std::vector<std::unique_ptr<Node>>& nodes) {
+    std::unique_ptr<Muscle> copied = std::make_unique<Muscle>();
+    copied->init(world, nodes, a, b, short_len, long_len, extend_time, contract_time,strength);
+    return std::move(copied);
+}
+
 std::unique_ptr<Muscle> Muscle::mutatedCopy(std::vector<std::unique_ptr<Node>>& nodes) {
     std::unique_ptr<Muscle> mutated = std::make_unique<Muscle>();
     float len1 = short_len + short_len*0.15f*r();
@@ -334,6 +356,12 @@ Node::Node(){
 Node::~Node() {
     world->DestroyBody(body);
     body = nullptr;
+}
+
+std::unique_ptr<Node> Node::copy() {
+    std::unique_ptr<Node> copied = std::make_unique<Node>();
+    copied->init(world, getPosition(), fixture_def.friction);
+    return std::move(copied);
 }
 
 std::unique_ptr<Node> Node::mutatedCopy() {

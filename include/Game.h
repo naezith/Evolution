@@ -56,6 +56,10 @@ class Game {
 
         bool j_last_frame = false;
         bool simulate_quick = false;
+
+        bool n_last_frame = false;
+        bool show_best = false;
+        std::unique_ptr<Creature> best_creature;
 };
 
 #endif // GAME_H
