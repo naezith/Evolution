@@ -58,6 +58,7 @@ void Creature::saveSnapshot(std::unique_ptr<Creature>& out) {
 std::unique_ptr<Creature> Creature::copy() {
     std::unique_ptr<Creature> copied;
     snapshot->saveSnapshot(copied);
+    copied->fitness = fitness;
     return std::move(copied);
 }
 
